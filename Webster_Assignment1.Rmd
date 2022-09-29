@@ -263,25 +263,33 @@ meth_top_terms %>% mutate(term = reorder_within(term, beta, topic)) %>%
 ## 6. Word clouds for each substance
 
 ```{r}
+custom_stopwords <-
+  tibble(
+    word = c("t.co", "https", "amp")
+  )# create custom stopwords based on what occurs in word clouds
+
 #fentanyl
 fent_words <- fent_tweets %>% select(text) %>% unnest_tokens(word, text)
-fent_count <- fent_words %>% anti_join(stop_words) %>% count(word, sort=T)
+fent_count <- fent_words %>% anti_join(stop_words) %>% 
+  anti_join(custom_stopwords) %>% count(word, sort=T)
 
-wordcloud(words=fent_count$word, freq=fent_count$n, min.freq = 1, max.words=100, 
+wordcloud(words=fent_count$word, freq=fent_count$n, min.freq = 5, max.words=100, 
           random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
 
 #suboxone
 sub_words <- sub_tweets %>% select(text) %>% unnest_tokens(word, text)
-sub_count <- sub_words %>% anti_join(stop_words) %>% count(word, sort=T)
+sub_count <- sub_words %>% anti_join(stop_words) %>% 
+  anti_join(custom_stopwords) %>% count(word, sort=T)
 
-wordcloud(words=sub_count$word, freq=sub_count$n, min.freq = 1, max.words=100, 
+wordcloud(words=sub_count$word, freq=sub_count$n, min.freq = 5, max.words=100, 
           random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
 
 #methadone
 meth_words <- methadone_tweets %>% select(text) %>% unnest_tokens(word, text)
-meth_count <- meth_words %>% anti_join(stop_words) %>% count(word, sort=T)
+meth_count <- meth_words %>% anti_join(stop_words) %>% 
+  anti_join(custom_stopwords) %>% count(word, sort=T)
 
-wordcloud(words=meth_count$word, freq=meth_count$n, min.freq = 1, max.words=100, 
+wordcloud(words=meth_count$word, freq=meth_count$n, min.freq = 5, max.words=100, 
           random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
 ```
 
@@ -295,6 +303,7 @@ ggplot(fent_tweets %>% count(date), aes(x=date, n)) +
   ylab("Number of Tweets") +
   ggtitle("Fentanyl Tweets per Day") +
   scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  scale_y_continuous(breaks=seq(200, 2000, by = 100)) +
   theme_bw()+
   theme(axis.text.x=element_text(angle=60, hjust=1))
 
@@ -304,6 +313,7 @@ ggplot(sub_tweets %>% count(date), aes(x=date, n)) +
   ylab("Number of Tweets") +
   ggtitle("Suboxone Tweets per Day") +
   scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  scale_y_continuous(breaks=seq(0, 200, by = 20)) +
   theme_bw()+
   theme(axis.text.x=element_text(angle=60, hjust=1))
 
@@ -313,6 +323,7 @@ ggplot(methadone_tweets %>% count(date), aes(x=date, n)) +
   ylab("Number of Tweets") +
   ggtitle("Methadone Tweets per Day") +
   scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  scale_y_continuous(breaks=seq(0, 300, by = 20)) +
   theme_bw()+
   theme(axis.text.x=element_text(angle=60, hjust=1))
   
