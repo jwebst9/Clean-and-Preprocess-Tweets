@@ -1,0 +1,338 @@
+---
+title: "Webster Assignment 1"
+author: "Webster, Joni"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+
+
+```{r}
+require(rtweet)
+require(dplyr)
+require(textTinyR)
+require(tm)
+require(wordcloud)
+require(jsonlite)
+require(corpus)
+require(quanteda)
+require(quanteda.textstats)
+require(stringr) #for regex
+require(LexisNexisTools)
+require(tidyverse)
+require(lsa)
+require(SnowballC)
+require(readxl)
+require(lubridate)
+require(stringr)
+```
+
+## 1. Explore dataset (date ranges, column names and descriptives, languages)
+
+
+
+```{r, echo=FALSE}
+set1 <- read_excel("~/Desktop/TADA Fellowship/Fall 2022/BSHE 760R/Assignments/TADA_A1_set1.xlsx")
+set2 <- read_excel("~/Desktop/TADA Fellowship/Fall 2022/BSHE 760R/Assignments/TADA_A1_set2.xlsx")
+
+```
+```{r}
+
+glimpse(set1)
+glimpse(set2)
+
+colnames(set1) <- c('id', 'date', 'lang', 'text', 'location') # change column names
+colnames(set2) <- c('id', 'date', 'lang', 'text', 'location') # change column names
+
+## change date to date format
+set1$date <- as_date(set1$date, tz="UTC")
+set2$date <- as_date(set2$date, tz="UTC")
+
+## summary data 
+summary(set1)
+summary(set2)
+
+set1 %>% count(location, sort=TRUE)
+set1 %>% count(lang, sort=TRUE)
+set2 %>% count(location, sort=TRUE)
+set2 %>% count(lang, sort=TRUE)
+```
+
+
+## 2. Number of posts in each document
+
+```{r}
+
+dim(set1) #171012 - tweets
+dim(set2) #226852 - tweets
+
+```
+
+
+## 3. Number of tweets that include "methadone", "suboxone", and "fentanyl" (alt spellings)
+
+```{r}
+
+options(max.print=10000)
+## merge datasets
+data <- rbind(set1, set2)
+dim(data)
+## select documents in english
+en_data <- data %>% filter(lang=="en")
+dim(en_data)
+
+## check and remove duplicate tweets
+en_data <- unique(en_data)
+
+## lowercase df so we can run regex
+en_data$text <-tolower(en_data$text)
+en_tweet_text <- en_data$text
+```
+
+```{r}
+## number of tweets that include methadone, suboxone, and fentanyl (fentanil, fent, subs)
+# filter for tweets with regex in text and then create dtm
+#fentanyl
+fent <- "fent"
+fent_tweets <- grep(fent, en_data$text)
+length(fent_tweets)
+fent_tweets <- en_data[fent_tweets, ]
+
+#suboxone
+suboxone <- "subs|suboxone"
+sub_tweets <- grep(suboxone, en_data$text)
+length(sub_tweets)
+sub_tweets <- en_data[sub_tweets, ]
+
+#methadone
+methadone <- "methadone"
+methadone_tweets <- grep(methadone, en_data$text)
+length(methadone_tweets)
+methadone_tweets <- en_data[methadone_tweets, ]
+```
+
+## 4. What are the fentanyl analogs (ie, carfentanil)
+
+```{r}
+require(slam)
+
+#create corpus and dtm - look at term distribution and word associations
+fent_corpus <- Corpus(VectorSource(fent_tweets$text))
+fent_corpus <- tm_map(fent_corpus, tolower)
+
+fent_StopWords <- c(stopwords(), "fentanyl") 
+sub_StopWords <- c(stopwords(), "suboxone", "subs") 
+meth_StopWords <- c(stopwords(), "methadone") 
+
+fent_corpus <- tm_map(fent_corpus, removeWords, fent_StopWords)
+
+removeURL <- function(x) gsub("http[[:alnum:]]*", "", x)#function to remove URL
+fent_corpus <- tm_map(fent_corpus, content_transformer(removeURL))
+
+fent_corpus <- tm_map(fent_corpus, removePunctuation)
+fent_corpus <- tm_map(fent_corpus, removeNumbers)
+
+fent_corpus <- tm_map(fent_corpus, stemDocument)
+
+removeEmoji <- function(x) gsub("[^\x01-\x7F]", "", x)# function to remove emojis
+fent_corpus <- tm_map(fent_corpus, content_transformer(removeEmoji))
+
+fent_dtm <- DocumentTermMatrix(fent_corpus)
+fent_dtm_tfidf <-DocumentTermMatrix(fent_corpus, control = list(weighting = function(x) 
+  weightTfIdf(x, normalize=FALSE), stopwords=TRUE))
+
+#suboxone corpus, dtm, dfm
+sub_corpus <- Corpus(VectorSource(sub_tweets$text))
+sub_corpus <- tm_map(sub_corpus, tolower)
+
+sub_corpus <- tm_map(sub_corpus, removeWords, sub_StopWords)
+sub_corpus <- tm_map(sub_corpus, content_transformer(removeURL))
+
+sub_corpus <- tm_map(sub_corpus, removePunctuation)
+sub_corpus <- tm_map(sub_corpus, removeNumbers)
+
+sub_corpus <- tm_map(sub_corpus, stemDocument)
+
+
+sub_corpus <- tm_map(sub_corpus, content_transformer(removeEmoji))
+
+sub_dtm <- DocumentTermMatrix(sub_corpus)
+sub_dtm_tfidf <-DocumentTermMatrix(sub_corpus, control = list(weighting = function(x) 
+  weightTfIdf(x, normalize=FALSE), stopwords=TRUE))
+
+#methadone corpus, dtm, dfm
+methadone_corpus <- Corpus(VectorSource(methadone_tweets$text))
+methadone_corpus <- tm_map(methadone_corpus, tolower)
+
+methadone_corpus <- tm_map(methadone_corpus,removeWords, meth_StopWords)
+
+methadone_corpus <- tm_map(methadone_corpus, content_transformer(removeURL))
+
+methadone_corpus <- tm_map(methadone_corpus, removePunctuation)
+methadone_corpus <- tm_map(methadone_corpus, removeNumbers)
+
+methadone_corpus <- tm_map(methadone_corpus, stemDocument)
+
+methadone_corpus <- tm_map(methadone_corpus, content_transformer(removeEmoji))
+
+methadone_dtm <- DocumentTermMatrix(methadone_corpus)
+methadone_dtm_tfidf <-DocumentTermMatrix(methadone_corpus, control = list(weighting = function(x) 
+  weightTfIdf(x, normalize=FALSE), stopwords=TRUE))
+```
+
+```{r}
+#find most frequent terms and word assocs to see what analogs might be
+findAssocs(fent_dtm, "fent", 0.1) #fentuo, #fendt, #zfent
+findAssocs(fent_dtm, "fentanyl", 0.1)
+#use frequent terms to identify derivatives 
+fent_high_freq <- findFreqTerms(fent_dtm, lowfreq=20, highfreq = Inf)
+fent_high_freq[1:100] #fentanyllac
+```
+
+
+## 5. What topics are common for the 3 substances? (5-10 top topics)
+
+```{r}
+require(topicmodels)
+require(tidytext)
+require(tidyr)
+require(ggplot2)
+require(slam)
+
+fent_rowTotals <- slam::row_sums(fent_dtm)
+fent_dtm<-fent_dtm[fent_rowTotals>0, ]
+
+sub_rowTotals <- slam::row_sums(sub_dtm)
+sub_dtm<-sub_dtm[sub_rowTotals>0, ]
+
+meth_rowTotals <- slam::row_sums(methadone_dtm)
+methadone_dtm<-methadone_dtm[meth_rowTotals>0, ]
+
+#fentanyl
+fent_lda <- LDA(fent_dtm, k=10, control=list(seed=1234))
+fent_topics <- tidy(fent_lda, matrix="beta")
+fent_top_terms <-fent_topics %>% group_by(topic) %>%
+  top_n(10, beta) %>%
+  arrange(topic, -beta)
+
+fent_top_terms %>% mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill=factor(topic))) +
+  geom_col(show.legend=FALSE) +
+  facet_wrap(~ topic, scales="free") +
+  coord_flip() +
+  scale_x_reordered() +
+  ggtitle("Top 10 Terms for Topics - Fentanyl Tweets")
+
+#suboxone
+sub_lda <- LDA(sub_dtm, k=10, control=list(seed=1234))
+sub_topics <- tidy(sub_lda, matrix="beta")
+sub_top_terms <-sub_topics %>% group_by(topic) %>%
+  top_n(10, beta) %>%
+  arrange(topic, -beta)
+
+sub_top_terms %>% mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill=factor(topic))) +
+  geom_col(show.legend=FALSE) +
+  facet_wrap(~ topic, scales="free") +
+  coord_flip() +
+  scale_x_reordered() +
+  ggtitle("Top 10 Terms for Topics - Suboxone Tweets")
+
+#methadone
+meth_lda <- LDA(methadone_dtm, k=10, control=list(seed=1234))
+meth_topics <- tidy(meth_lda, matrix="beta")
+meth_top_terms <-meth_topics %>% group_by(topic) %>%
+  top_n(10, beta) %>%
+  arrange(topic, -beta)
+
+meth_top_terms %>% mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill=factor(topic))) +
+  geom_col(show.legend=FALSE) +
+  facet_wrap(~ topic, scales="free") +
+  coord_flip() +
+  scale_x_reordered() +
+  ggtitle("Top 10 Terms for Topics - Methadone Tweets")
+```
+
+
+## 6. Word clouds for each substance
+
+```{r}
+#fentanyl
+fent_words <- fent_tweets %>% select(text) %>% unnest_tokens(word, text)
+fent_count <- fent_words %>% anti_join(stop_words) %>% count(word, sort=T)
+
+wordcloud(words=fent_count$word, freq=fent_count$n, min.freq = 1, max.words=100, 
+          random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+#suboxone
+sub_words <- sub_tweets %>% select(text) %>% unnest_tokens(word, text)
+sub_count <- sub_words %>% anti_join(stop_words) %>% count(word, sort=T)
+
+wordcloud(words=sub_count$word, freq=sub_count$n, min.freq = 1, max.words=100, 
+          random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+#methadone
+meth_words <- methadone_tweets %>% select(text) %>% unnest_tokens(word, text)
+meth_count <- meth_words %>% anti_join(stop_words) %>% count(word, sort=T)
+
+wordcloud(words=meth_count$word, freq=meth_count$n, min.freq = 1, max.words=100, 
+          random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+```
+
+
+## 7. Time series for each set w/ frequencies as y
+
+```{r}
+ggplot(fent_tweets %>% count(date), aes(x=date, n)) +
+  geom_line(color="steelblue") +
+  xlab("Date") +
+  ylab("Number of Tweets") +
+  ggtitle("Fentanyl Tweets per Day") +
+  scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=60, hjust=1))
+
+ggplot(sub_tweets %>% count(date), aes(x=date, n)) +
+  geom_line(color="steelblue") +
+  xlab("Date") +
+  ylab("Number of Tweets") +
+  ggtitle("Suboxone Tweets per Day") +
+  scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=60, hjust=1))
+
+ggplot(methadone_tweets %>% count(date), aes(x=date, n)) +
+  geom_line(color="steelblue") +
+  xlab("Date") +
+  ylab("Number of Tweets") +
+  ggtitle("Methadone Tweets per Day") +
+  scale_x_date(date_breaks = "1 week", date_labels="%Y %b %d", limit=c(as.Date("2019-11-01"),as.Date("2020-04-29"))) +
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=60, hjust=1))
+  
+```
+
+
+## 8. Top 10 bigrams for each set
+
+```{r}
+
+fent_bigrams <- fent_tweets %>% unnest_tokens(bigram, text, token="ngrams", n=2)
+fent_bigrams_sort <- fent_bigrams %>% count(bigram, sort=TRUE)
+fent_bigrams_sort[1:10, ]
+
+sub_bigrams <- sub_tweets %>% unnest_tokens(bigram, text, token="ngrams", n=2)
+sub_bigrams_sort <- sub_bigrams %>% count(bigram, sort=TRUE)
+sub_bigrams_sort[1:10, ]
+
+methadone_bigrams <- methadone_tweets %>% unnest_tokens(bigram, text, token="ngrams", n=2)
+methadone_bigrams_sort <- methadone_bigrams %>% count(bigram, sort=TRUE)
+methadone_bigrams_sort[1:10, ]
+```
+
