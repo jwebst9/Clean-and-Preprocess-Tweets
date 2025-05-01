@@ -37,8 +37,8 @@ require(stringr)
 
 
 ```{r, echo=FALSE}
-set1 <- read_excel("~/Desktop/TADA Fellowship/Fall 2022/BSHE 760R/Assignments/TADA_A1_set1.xlsx")
-set2 <- read_excel("~/Desktop/TADA Fellowship/Fall 2022/BSHE 760R/Assignments/TADA_A1_set2.xlsx")
+set1 <- read_excel("~/Desktop/BSHE 760R/Assignments/TADA_A1_set1.xlsx")
+set2 <- read_excel("~/Desktop/BSHE 760R/Assignments/TADA_A1_set2.xlsx")
 
 ```
 ```{r}
