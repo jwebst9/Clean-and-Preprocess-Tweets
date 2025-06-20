@@ -1,6 +1,6 @@
 ---
 title: "Webster Assignment 1"
-author: "Webster, Joni"
+author: "Webster"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -37,8 +37,8 @@ require(stringr)
 
 
 ```{r, echo=FALSE}
-set1 <- read_excel("~/Desktop/BSHE 760R/Assignments/TADA_A1_set1.xlsx")
-set2 <- read_excel("~/Desktop/BSHE 760R/Assignments/TADA_A1_set2.xlsx")
+set1 <- read_excel("~/BSHE 760R/Assignments/TADA_A1_set1.xlsx")
+set2 <- read_excel("~/BSHE 760R/Assignments/TADA_A1_set2.xlsx")
 
 ```
 ```{r}
